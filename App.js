@@ -1,5 +1,5 @@
 import React, { useRef, useState } from "react";
-import { Dimensions, Image, StyleSheet, Text, Alert, TextInput, TouchableOpacity, View, useWindowDimensions, Platform } from "react-native";
+import { Dimensions, Image, StyleSheet, Text, Alert, TextInput, TouchableOpacity, View, useWindowDimensions, Platform ,Keyboard} from "react-native";
 import SignatureScreen from 'react-native-signature-canvas';
 import RNFetchBlob from "rn-fetch-blob";
 
@@ -114,11 +114,18 @@ const App = () => {
     ref.current.draw();
   };
 
-  const handleChange = () => {
+  const handleColorChange = () => {
     ref.current.changePenColor(penColor);
-    ref.current.changePenSize(penSize, penSize)
   };
 
+  const handleSizeChange=()=>{
+    ref.current.changePenSize(penSize, penSize)
+  }
+
+  const handleChange=()=>{
+    ref.current.changePenColor(penColor);
+    ref.current.changePenSize(penSize, penSize)
+  }
 
   return (
     <View style={styles.containerStyle}>
@@ -131,11 +138,15 @@ const App = () => {
             >
               <Text style={styles.text}>Undo</Text>
             </TouchableOpacity>
+            <View style={{backgroundColor:`${penColor}`,height:20,width:20,marginRight:5,borderColor:"#ccc",borderWidth:1}}/>
             <TextInput
               placeholder="Color"
-              style={[styles.textInput, { backgroundColor: `${penColor}`, fontSize: 16, width: 80, height: 45 }]}
+              placeholderTextColor={"#ccc"}
+              style={[styles.textInput, { backgroundColor:"#FFF",color:"black", fontSize: 16, width: 80, height: 45 }]}
               autoCapitalize="none"
               value={penColor}
+              onBlur={handleColorChange}
+              onEndEditing={handleColorChange}
               onChangeText={setPenColor} />
             <TextInput
               placeholder="Size"
@@ -143,6 +154,9 @@ const App = () => {
               style={[styles.textInput, { backgroundColor: "#fff", color: "black", fontSize: 16, width: 50, marginLeft: 10, height: 45, alignItems: "baseline" }]}
               autoCapitalize="none"
               value={`${penSize}`}
+              keyboardType='number-pad'
+              onBlur={handleSizeChange}
+              onEndEditing={handleSizeChange}
               onChangeText={setPenSize} />
             <TouchableOpacity
               style={[styles.setButton, { marginLeft: 10, backgroundColor: 'red' }]}
@@ -160,11 +174,12 @@ const App = () => {
           <SignatureScreen
             ref={ref}
             webStyle={style}
+
             webviewContainerStyle={{ opacity: 0.99 }}
             onEnd={handleEnd}
             onOK={handleOK}
-            minWidth={1}
-            maxWidth={1}
+            minWidth={penSize}
+            maxWidth={penSize}
             penColor={penColor}
             clearText={"clear"}
             onGetData={handleData}
