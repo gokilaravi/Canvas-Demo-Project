@@ -1,15 +1,19 @@
 import React, { useRef, useState } from "react";
-import { Dimensions, Image, StyleSheet, Text, TextInput, TouchableOpacity, View, useWindowDimensions } from "react-native";
+import { Dimensions, Image, StyleSheet, Text, Alert, TextInput, TouchableOpacity, View, useWindowDimensions, Platform } from "react-native";
 import SignatureScreen from 'react-native-signature-canvas';
+import RNFetchBlob from "rn-fetch-blob";
 
 const App = () => {
 
-    const ref = useRef();
-    const { height } = useWindowDimensions();
-    const [signature, setSignature] = useState(null);
-    const[penColor,setPenColor]=useState("pink")
+  const ref = useRef();
+  const { height } = useWindowDimensions();
+  const [signature, setSignature] = useState(null);
+  const [penColor, setPenColor] = useState("pink");
+  const [isLoading, setLoading] = useState(false);
+  const [signatureUrl, setSignatureUrl] = useState(null);
+  const [penSize, setPenSize] = useState(1);
 
-    const style = `.m-signature-pad {height:${height}px;margin:0,border:2,box-shadow: none; } 
+  const style = `.m-signature-pad {height:${height}px;margin:0,border:2,box-shadow: none; } 
                   .m-signature-pad--footer
                   .button.clear{
                     display:none
@@ -22,145 +26,246 @@ const App = () => {
                   }
                   `
 
-    // Called after ref.current.readSignature() reads a non-empty base64 string
-    const handleOK = (signature) => {
-        console.log(signature);
-        setSignature(signature)
-        // Callback from Component props
-    };
+  // Called after ref.current.readSignature() reads a non-empty base64 string
+  const handleOK = (signature) => {
+    setSignature(signature)
+    // Callback from Component props
+  };
 
-    // Called after ref.current.readSignature() reads an empty string
-    const handleEmpty = () => {
-        console.log("Empty");
-    };
 
-    // Called after ref.current.clearSignature()
-    const handleClear = () => {
-        console.log("clear success!");
+  // Called after ref.current.clearSignature()
+  const handleClear = () => {
+    ref.current.clearSignature();
+    setSignature(null);
+    setSignatureUrl(null)
+  }
+  const handleEnd = () => {
+    ref.current.readSignature();
+  };
+
+  // Called after ref.current.getData()
+  const handleData = (data) => {
+    console.log(data);
+  };
+
+  const onPressExport = () => {
+    if (signature !== null) {
+      setLoading(true);
+      handleExport();
+    } else {
+      Alert.alert('Alert', 'Please give your sign', [
+        {
+          text: 'Cancel',
+          onPress: () => console.log('Cancel Pressed'),
+          style: 'cancel',
+        },
+        { text: 'OK', onPress: () => console.log('OK Pressed') },
+      ]);
     }
-    const handleEnd = () => {
-        ref.current.readSignature();
-    };
+  };
 
-    // Called after ref.current.getData()
-    const handleData = (data) => {
-        console.log(data);
-    };
+  const handleExport = () => {
 
-    const handleUndo = () => {
-        ref.current.undo();
-      };
-      
-      const handleRedo = () => {
-        ref.current.redo();
-      };
+    if (Platform.OS == 'android') {
+      const dirs = RNFetchBlob.fs.dirs;
+      const image_data = signature.split('data:image/png;base64,');
+      const filePath = dirs.DownloadDir + "/" + 'signture' + new Date().getMilliseconds() + '.png'
+      RNFetchBlob.fs.writeFile(filePath, image_data[1], 'base64').then(() => {
+        let uri = filePath.replace("file://", "");
+        RNFetchBlob.fs.stat(uri).then(stat => {
+          setSignatureUrl(stat);
+          Alert.alert('Save Successfully', 'Image saved successfuly in your local storage', [
+            {
+              text: 'Cancel',
+              onPress: () => console.log('Cancel Pressed'),
+              style: 'cancel',
+            },
+            { text: 'OK', onPress: () => console.log('OK Pressed') },
+          ]);
+        }).catch(error => {
+          console.log("error", error);
+        });
+      }).catch((errorMessage) => {
+        console.log(errorMessage)
+      });
+    }
+    setLoading(false);
 
-    const handleColorChange = () => {
-        ref.current.changePenColor(penColor);
-      };
+  }
 
-    return (
+  const handleDelete = () => {
+    setSignature(null);
+    setSignatureUrl(null);
+  }
+
+  const handleUndo = () => {
+    ref.current.undo();
+  };
+
+  const handleRedo = () => {
+    ref.current.redo();
+  };
+
+  const handleErase = () => {
+    ref.current.erase();
+  };
+
+  const handleDraw = () => {
+    ref.current.draw();
+  };
+
+  const handleChange = () => {
+    ref.current.changePenColor(penColor);
+    ref.current.changePenSize(penSize, penSize)
+  };
+
+
+  return (
+    <View style={styles.containerStyle}>
+      {signatureUrl == null &&
         <View style={styles.containerStyle}>
-  <View style={styles.row}>
-    <TouchableOpacity
-      style={[styles.setButton, {marginRight: 30, backgroundColor: 'red'}]}
-      onPress={handleUndo}
-      >
-      <Text style={styles.text}>Undo</Text>
-      </TouchableOpacity>
-    <TextInput
-      placeholder= "Specify Pen Color"
-      style={[styles.textInput,{backgroundColor:`${penColor}`}]}
-      autoCapitalize="none"
-      value={penColor}
-      onChangeText={setPenColor} />
-      <TouchableOpacity
-      style={styles.setButton}
-      onPress={handleColorChange}>
+          <View style={styles.row}>
+            <TouchableOpacity
+              style={[styles.setButton, { marginRight: 10, backgroundColor: 'red' }]}
+              onPress={handleUndo}
+            >
+              <Text style={styles.text}>Undo</Text>
+            </TouchableOpacity>
+            <TextInput
+              placeholder="Color"
+              style={[styles.textInput, { backgroundColor: `${penColor}`, fontSize: 16, width: 80, height: 45 }]}
+              autoCapitalize="none"
+              value={penColor}
+              onChangeText={setPenColor} />
+            <TextInput
+              placeholder="Size"
+              placeholderTextColor={"#ccc"}
+              style={[styles.textInput, { backgroundColor: "#fff", color: "black", fontSize: 16, width: 50, marginLeft: 10, height: 45, alignItems: "baseline" }]}
+              autoCapitalize="none"
+              value={`${penSize}`}
+              onChangeText={setPenSize} />
+            <TouchableOpacity
+              style={[styles.setButton, { marginLeft: 10, backgroundColor: 'red' }]}
+              onPress={handleRedo}
+            >
+              <Text style={styles.text}>Redo</Text>
+            </TouchableOpacity>
+          </View>
+          <TouchableOpacity
+            style={[styles.setButton, { alignSelf: "center", marginBottom: 10 }]}
+            onPress={handleChange}>
 
- <Text style={styles.text}>Set</Text>
-      </TouchableOpacity>
-      <TouchableOpacity
-      style={[styles.setButton, {marginLeft: 30, backgroundColor: 'red'}]}
-      onPress={handleRedo}
-      >
-      <Text style={styles.text}>Redo</Text>
-      </TouchableOpacity>
-    </View>
-            <SignatureScreen
-                ref={ref}
-                webStyle={style}
-                webviewContainerStyle={{ opacity: 0.99 }}
-                onEnd={handleEnd}
-                penColor={penColor}
-                onOK={handleOK}
-                onEmpty={handleEmpty}
-                onClear={handleClear}
-                onGetData={handleData}
+            <Text style={styles.text}>Set</Text>
+          </TouchableOpacity>
+          <SignatureScreen
+            ref={ref}
+            webStyle={style}
+            webviewContainerStyle={{ opacity: 0.99 }}
+            onEnd={handleEnd}
+            onOK={handleOK}
+            minWidth={1}
+            maxWidth={1}
+            penColor={penColor}
+            clearText={"clear"}
+            onGetData={handleData}
+          />
+          <View style={styles.row}>
+            <TouchableOpacity
+              style={[styles.setButton, { marginLeft: 10, backgroundColor: 'deepskyblue' }]}
+              onPress={handleClear}
+            >
+              <Text style={styles.text}>Clear</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.setButton, { marginLeft: 10, backgroundColor: 'deepskyblue' }]}
+              onPress={onPressExport}
+            >
+              <Text style={styles.text}>Export</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.setButton, { marginLeft: 10, backgroundColor: 'deepskyblue' }]}
+              onPress={handleErase}
+            >
+              <Text style={styles.text}>Erase</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.setButton, { marginLeft: 10, backgroundColor: 'deepskyblue' }]}
+              onPress={handleDraw}
+            >
+              <Text style={styles.text}>Draw</Text>
+            </TouchableOpacity>
+          </View>
+        </View>}
+      {signatureUrl ? (
+        <View>
+          <View style={styles.imageStyle}>
+            <Image
+              resizeMode={"contain"}
+              style={{ width: Dimensions.get('window').width, height: Dimensions.get('window').height - 200 }}
+              source={{ uri: signature }}
             />
-            {/* {signature ? (
-                <View style={styles.imageStyle}>
-                    <Image
-                        resizeMode={"contain"}
-                        style={{ width: Dimensions.get('window').width, height: Dimensions.get('window').height-200 }}
-                        source={{ uri: signature }}
-                    />
-                </View>
-            ) : null} */}
+          </View>
+          <TouchableOpacity
+            style={[styles.setButton, { marginLeft: 10, marginTop: 10, backgroundColor: 'deepskyblue', alignItems: "center" }]}
+            onPress={handleDelete}
+          >
+            <Text style={styles.text}>Clear</Text>
+          </TouchableOpacity>
         </View>
+      ) : null}
+    </View>
 
-    );
+  );
 };
 
 const styles = StyleSheet.create({
-    containerStyle: {
-        flex: 1,paddingBottom:30,
-        paddingTop: 20, paddingHorizontal: 15,
-        backgroundColor: "#d9d8d7"
-    },
-    imageStyle: {
-        backgroundColor: "#fff",
-        marginTop: 10,
-        alignItems: "center",
-        justifyContent: "center"
-    },
-    row: {
-        flexDirection: 'row',
-        alignItems:'center',
-        justifyContent:"center",
-        marginTop: 10,
-        borderBottomWidth: 1,
-          borderBottomColor: '#f2f2f2',
-          paddingBottom: 5
-        },
-        textSign: {
-          color: 'deepskyblue',
-          fontWeight: 'bold',
-          paddingVertical: 5,
-        },
-        text: {
-          color: '#fff',
-          fontWeight: '900',
-        },
-        textInput: {
-            paddingVertical: 10,
-            textAlign: 'center',
-            borderWidth:1,borderRadius:5,
-            borderColor:"gray",
-            fontSize:12,
-            fontWeight:"bold"
-            
-          },
-          setButton: {
-            backgroundColor: 'deepskyblue',
-            textAlign: 'center',
-            fontWeight: '900',
-            color: '#fff',
-            marginHorizontal: 10,
-            paddingVertical: 15,
-            paddingHorizontal: 20,
-            borderRadius: 5,
-          }
+  containerStyle: {
+    flex: 1, paddingBottom: 30,
+    paddingTop: 20, paddingHorizontal: 15,
+    backgroundColor: "#d9d8d7"
+  },
+  imageStyle: {
+    backgroundColor: "#fff",
+    marginTop: 10,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: "center",
+    marginTop: 10,
+    marginBottom: 10,
+    paddingBottom: 5,
+    paddingHorizontal: 20
+  },
+  textSign: {
+    color: 'deepskyblue',
+    fontWeight: 'bold',
+    paddingVertical: 5,
+  },
+  text: {
+    color: '#fff',
+    fontWeight: '900',
+  },
+  textInput: {
+    textAlign: 'center',
+    borderWidth: 1, borderRadius: 5,
+    borderColor: "gray",
+    fontSize: 12,
+    fontWeight: "bold",
+
+  },
+  setButton: {
+    backgroundColor: 'deepskyblue',
+    textAlign: 'center',
+    fontWeight: '900',
+    color: '#fff',
+    marginHorizontal: 10,
+    paddingVertical: 15,
+    paddingHorizontal: 20,
+    borderRadius: 5,
+  }
 
 })
 export default App;
